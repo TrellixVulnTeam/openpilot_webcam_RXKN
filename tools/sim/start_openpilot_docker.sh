@@ -23,6 +23,7 @@ docker run --net=host\
   --device=/dev/dri:/dev/dri \
   --device=/dev/input:/dev/input \
   -v /tmp/.X11-unix:/tmp/.X11-unix \
+  -v "$DIR/../":/openpilot/tools/    --device /dev/video0  --device /dev/video1 \
   --shm-size 1G \
   -e DISPLAY=$DISPLAY \
   -e QT_X11_NO_MITSHM=1 \
