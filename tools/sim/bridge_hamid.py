@@ -13,6 +13,8 @@ import numpy as np
 import pyopencl as cl
 import pyopencl.array as cl_array
 
+import cv2
+
 import cereal.messaging as messaging
 from cereal import log
 from cereal.visionipc import VisionIpcServer, VisionStreamType
@@ -47,7 +49,7 @@ class VehicleState:
     self.speed = 0.0
     self.angle = 0.0
     self.bearing_deg = 0.0
-    self.vel = carla.Vector3D()
+    self.vel =  9999 # carla.Vector3D()
     self.cruise_button = 0
     self.is_engaged = False
     self.ignition = True
@@ -86,7 +88,7 @@ class Camerad:
       self.krnl = prg.rgb_to_yuv
     self.Wdiv4 = W // 4 if (W % 4 == 0) else (W + (4 - W % 4)) // 4
     self.Hdiv4 = H // 4 if (H % 4 == 0) else (H + (4 - H % 4)) // 4
-
+  """
   def cam_callback_road(self, image):
     self._cam_callback(image, self.frame_road_id, 'roadCameraState', VisionStreamType.VISION_STREAM_ROAD)
     self.frame_road_id += 1
@@ -94,15 +96,14 @@ class Camerad:
   def cam_callback_wide_road(self, image):
     self._cam_callback(image, self.frame_wide_id, 'wideRoadCameraState', VisionStreamType.VISION_STREAM_WIDE_ROAD)
     self.frame_wide_id += 1
-
+  """
   def _cam_callback(self, image, frame_id, pub_type, yuv_type):
     # print(type(image)) #  <class 'carla.libcarla.Image'>
     # print(type(image.raw_data)) # <class 'memoryview'>
-   
-    img = np.frombuffer(image.raw_data, dtype=np.dtype("uint8"))
+    img = np.frombuffer(image, dtype=np.dtype("uint8"))
     img = np.reshape(img, (H, W, 4))
     img = img[:, :, [0, 1, 2]].copy()
-    print(type(img), img.shape, img.dtype) # <class 'numpy.ndarray'> (1208, 1928, 3) uint8
+    # print(type(img), img.shape, img.dtype) # <class 'numpy.ndarray'> (1208, 1928, 3) uint8
 
 
     # convert RGB frame to YUV
@@ -117,7 +118,7 @@ class Camerad:
 
     dat = messaging.new_message(pub_type)
     msg = {
-      "frameId": image.frame,
+      "frameId": frame_id,
       "transform": [1.0, 0.0, 0.0,
                     0.0, 1.0, 0.0,
                     0.0, 0.0, 1.0]
@@ -229,6 +230,26 @@ def can_function_runner(vs: VehicleState, exit_event: threading.Event):
     i += 1
 
 
+
+
+def webcam(camerad: Camerad, exit_event: threading.Event):
+  rk = Ratekeeper(20)
+  # Load the video
+  myframeid = 0
+  cap = cv2.VideoCapture(0) #set camera ID here, index X in /dev/videoX
+  while not exit_event.is_set():
+    ret, frame = cap.read()
+    if not ret:
+      end_of_video = True
+      break
+    frame = cv2.resize(frame, (W, H))
+    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2BGRA)
+    #cv2.imwrite('webcam.jpg', frame)
+    camerad._cam_callback(frame, frame_id=myframeid, pub_type='roadCameraState', yuv_type=VisionStreamType.VISION_STREAM_ROAD)
+    camerad._cam_callback(frame, frame_id=myframeid, pub_type='wideRoadCameraState', yuv_type=VisionStreamType.VISION_STREAM_WIDE_ROAD)
+    myframeid = myframeid +1 
+    rk.keep_time()
+
 def connect_carla_client():
   client = carla.Client("127.0.0.1", 2000)
   client.set_timeout(5)
@@ -284,6 +305,8 @@ class CarlaBridge:
       self.close()
 
   def _run(self, q: Queue):
+    max_steer_angle = 30
+    """
     client = connect_carla_client()
     world = client.load_world(self._args.town)
 
@@ -336,15 +359,17 @@ class CarlaBridge:
       camera = world.spawn_actor(blueprint, transform, attach_to=vehicle)
       camera.listen(callback)
       return camera
+    """
 
     self._camerad = Camerad()
+    """
     road_camera = create_camera(fov=40, callback=self._camerad.cam_callback_road)
     road_wide_camera = create_camera(fov=120, callback=self._camerad.cam_callback_wide_road)  # fov bigger than 120 shows unwanted artifacts
 
     self._carla_objects.extend([road_camera, road_wide_camera])
-
+    """
     vehicle_state = VehicleState()
-
+    """
     # reenable IMU
     imu_bp = blueprint_library.find('sensor.other.imu')
     imu = world.spawn_actor(imu_bp, transform, attach_to=vehicle)
@@ -355,11 +380,13 @@ class CarlaBridge:
     gps.listen(lambda gps: gps_callback(gps, vehicle_state))
 
     self._carla_objects.extend([imu, gps])
+    """
     # launch fake car threads
     self._threads.append(threading.Thread(target=panda_state_function, args=(vehicle_state, self._exit_event,)))
     self._threads.append(threading.Thread(target=peripheral_state_function, args=(self._exit_event,)))
     self._threads.append(threading.Thread(target=fake_driver_monitoring, args=(self._exit_event,)))
     self._threads.append(threading.Thread(target=can_function_runner, args=(vehicle_state, self._exit_event,)))
+    self._threads.append(threading.Thread(target=webcam, args=(self._camerad, self._exit_event,)))
     for t in self._threads:
       t.start()
 
@@ -381,8 +408,8 @@ class CarlaBridge:
     steer_manual_multiplier = 45 * STEER_RATIO  # keyboard signal is always 1
 
     # Simulation tends to be slow in the initial steps. This prevents lagging later
-    for _ in range(20):
-      world.tick()
+    # for _ in range(20):
+    #  world.tick()
 
     # loop
     rk = Ratekeeper(100, print_delay_threshold=0.05)
@@ -391,7 +418,6 @@ class CarlaBridge:
       # 1. Read the throttle, steer and brake from op or manual controls
       # 2. Set instructions in Carla
       # 3. Send current carstate to op via can
-
       cruise_button = 0
       throttle_out = steer_out = brake_out = 0.0
       throttle_op = steer_op = brake_op = 0.0
@@ -486,6 +512,7 @@ class CarlaBridge:
       vc.throttle = throttle_out / 0.6
       vc.steer = steer_carla
       vc.brake = brake_out
+      """
       vehicle.apply_control(vc)
 
       # --------------Step 3-------------------------------
@@ -493,6 +520,7 @@ class CarlaBridge:
       speed = math.sqrt(vel.x ** 2 + vel.y ** 2 + vel.z ** 2)  # in m/s
       vehicle_state.speed = speed
       vehicle_state.vel = vel
+      """
       vehicle_state.angle = steer_out
       vehicle_state.cruise_button = cruise_button
       vehicle_state.is_engaged = is_openpilot_engaged
@@ -500,9 +528,10 @@ class CarlaBridge:
       if rk.frame % PRINT_DECIMATION == 0:
         print("frame: ", "engaged:", is_openpilot_engaged, "; throttle: ", round(vc.throttle, 3), "; steer(c/deg): ",
               round(vc.steer, 3), round(steer_out, 3), "; brake: ", round(vc.brake, 3))
-
+      """
       if rk.frame % 5 == 0:
         world.tick()
+      """
       rk.keep_time()
       self.started = True
 

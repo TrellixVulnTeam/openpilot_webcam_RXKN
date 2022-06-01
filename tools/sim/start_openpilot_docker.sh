@@ -19,12 +19,12 @@ docker run --net=host\
   --name openpilot_client \
   --rm \
   -it \
-  --gpus all \
   --device=/dev/dri:/dev/dri \
   --device=/dev/input:/dev/input \
   -v /tmp/.X11-unix:/tmp/.X11-unix \
-  -v "$DIR/../":/openpilot/tools/ \
-  -v "$DIR/../../selfdrive/manager/process_config.py":/openpilot/selfdrive/manager/process_config.py \
+  -v "$DIR/bridge_hamid.py":/openpilot/tools/sim/bridge_hamid.py \
+  -v "$DIR/tmux_script.sh":/openpilot/tools/sim/tmux_script.sh \
+  -v "$DIR/out.txt":/openpilot/tools/sim/out.txt \
   --device /dev/video0  --device /dev/video1 \
   --shm-size 1G \
   -e DISPLAY=$DISPLAY \
@@ -32,4 +32,4 @@ docker run --net=host\
   -w "$OPENPILOT_DIR/tools/sim" \
   $EXTRA_ARGS \
   ghcr.io/commaai/openpilot-sim:latest \
-  /bin/bash -c "./tmux_script.sh $*"
+  /bin/bash -c "chmod +x ./tmux_script.sh; ./tmux_script.sh $*"
