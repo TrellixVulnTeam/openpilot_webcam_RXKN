@@ -231,12 +231,14 @@ def can_function_runner(vs: VehicleState, exit_event: threading.Event):
 
 
 
-
+# 0 -> laptop webcam
+# 2 -> laptop laser
+# 
 def webcam(camerad: Camerad, exit_event: threading.Event):
   rk = Ratekeeper(20)
   # Load the video
   myframeid = 0
-  cap = cv2.VideoCapture(0) #set camera ID here, index X in /dev/videoX
+  cap = cv2.VideoCapture(4) #set camera ID here, index X in /dev/videoX
   while not exit_event.is_set():
     ret, frame = cap.read()
     if not ret:
