@@ -49,7 +49,7 @@ class VehicleState:
     self.speed = 0.0
     self.angle = 0.0
     self.bearing_deg = 0.0
-    self.vel =  9999 # carla.Vector3D()
+    self.vel =  1 # carla.Vector3D()
     self.cruise_button = 0
     self.is_engaged = False
     self.ignition = True
@@ -466,7 +466,11 @@ class CarlaBridge:
 
       if is_openpilot_engaged:
         sm.update(0)
-
+        if sm['carControl'].actuators.accel != 0 or sm['carControl'].actuators.steeringAngleDeg != 0 :
+          print("car accel:", sm['carControl'].actuators.accel , " car steeringAngleDeg", sm['carControl'].actuators.steeringAngleDeg )
+          import time
+          time.sleep(2.4)
+        
         # TODO gas and brake is deprecated
         throttle_op = clip(sm['carControl'].actuators.accel / 1.6, 0.0, 1.0)
         brake_op = clip(-sm['carControl'].actuators.accel / 4.0, 0.0, 1.0)
@@ -520,9 +524,10 @@ class CarlaBridge:
       # --------------Step 3-------------------------------
       vel = vehicle.get_velocity()
       speed = math.sqrt(vel.x ** 2 + vel.y ** 2 + vel.z ** 2)  # in m/s
-      vehicle_state.speed = speed
-      vehicle_state.vel = vel
       """
+      vehicle_state.speed = 2
+      vehicle_state.vel = 2
+    
       vehicle_state.angle = steer_out
       vehicle_state.cruise_button = cruise_button
       vehicle_state.is_engaged = is_openpilot_engaged
