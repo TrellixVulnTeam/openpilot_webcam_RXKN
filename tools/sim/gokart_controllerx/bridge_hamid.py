@@ -1,4 +1,11 @@
 #!/usr/bin/env python3
+
+import time
+import rospy
+from gokart_controller import Gokart_Controller
+import os
+
+
 import argparse
 import math
 import os
@@ -25,6 +32,15 @@ from common.realtime import DT_DMON, Ratekeeper
 from selfdrive.car.honda.values import CruiseButtons
 from selfdrive.test.helpers import set_params_enabled
 from tools.sim.lib.can import can_function
+
+
+
+def convert(value, in_min, in_max, out_min, out_max):
+    in_range = in_max - in_min
+    out_range = out_max - out_min
+    scale = float(value - in_min) / float(in_range)
+    return out_min + (scale * out_range)
+
 
 W, H = 1928, 1208
 REPEAT_COUNTER = 5
@@ -263,6 +279,22 @@ class CarlaBridge:
   def __init__(self, arguments):
     set_params_enabled()
 
+
+    print("os.environ['ROS_MASTER_URI']", os.environ['ROS_MASTER_URI'])
+
+    self.gc = Gokart_Controller(os.environ['ROS_MASTER_URI'])
+    rate = rospy.Rate(10)
+    for i in range(1,5):
+      print(i)
+      self.gc.set_turn_rate(10)
+      rate.sleep()
+
+    time.sleep(2)	
+    for i in range(1,5):
+      print(i)
+      self.gc.set_turn_rate(2)
+      rate.sleep()
+  
     msg = messaging.new_message('liveCalibration')
     msg.liveCalibration.validBlocks = 20
     msg.liveCalibration.rpyCalib = [0.0, 0.0, 0.0]
@@ -464,12 +496,17 @@ class CarlaBridge:
         old_throttle = throttle_out
         old_brake = brake_out
 
+
+
       if is_openpilot_engaged:
         sm.update(0)
         if sm['carControl'].actuators.accel != 0 or sm['carControl'].actuators.steeringAngleDeg != 0 :
-          print("car accel:", sm['carControl'].actuators.accel , " car steeringAngleDeg", sm['carControl'].actuators.steeringAngleDeg )
-          import time
-          time.sleep(2.4)
+          converted_angle = convert( sm['carControl'].actuators.steeringAngleDeg, -45, 45, 1, 9)
+          print("car accel:", sm['carControl'].actuators.accel , " car steeringAngleDeg", sm['carControl'].actuators.steeringAngleDeg, "car converted angle", converted_angle)
+          print("TYPE", type(converted_angle))
+          self.gc.set_turn_rate(converted_angle)
+          # gc.set_speed(sm['carControl'].actuators.accel)
+          # rate.sleep()
         
         # TODO gas and brake is deprecated
         throttle_op = clip(sm['carControl'].actuators.accel / 1.6, 0.0, 1.0)
@@ -509,6 +546,7 @@ class CarlaBridge:
             old_steer = 0
 
       # --------------Step 2-------------------------------
+
       steer_carla = steer_out / (max_steer_angle * STEER_RATIO * -1)
 
       steer_carla = np.clip(steer_carla, -1, 1)
@@ -539,7 +577,7 @@ class CarlaBridge:
       if rk.frame % 5 == 0:
         world.tick()
       """
-      rk.keep_time()
+      # rk.keep_time()
       self.started = True
 
   def close(self):
