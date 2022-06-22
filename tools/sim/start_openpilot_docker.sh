@@ -32,11 +32,10 @@ docker run --net=host\
   --device=/dev/dri:/dev/dri \
   --device=/dev/input:/dev/input \
   -v /tmp/.X11-unix:/tmp/.X11-unix \
-  -v "$DIR/bridge_hamid.py":/openpilot/tools/sim/bridge_hamid.py \
   -v "$DIR/tmux_script.sh":/openpilot/tools/sim/tmux_script.sh \
-  -v "$DIR/out.txt":/openpilot/tools/sim/out.txt \
   -v "$DIR/gokart_controller/":/openpilot/tools/sim/gokart_controller \
   -v "$DIR/realtime.py":/openpilot/common/realtime.py \
+  -v "$DIR/run_ros_bridge.sh":/openpilot/tools/sim/run_ros_bridge.sh \
   --device /dev/video0  --device /dev/video1 --device /dev/video2  --device /dev/video3  --device /dev/video4  --device /dev/video5 \
   --shm-size 1G \
   -e DISPLAY=$DISPLAY \
