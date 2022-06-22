@@ -35,6 +35,7 @@ docker run --net=host\
   -v "$DIR/bridge_hamid.py":/openpilot/tools/sim/bridge_hamid.py \
   -v "$DIR/tmux_script.sh":/openpilot/tools/sim/tmux_script.sh \
   -v "$DIR/out.txt":/openpilot/tools/sim/out.txt \
+  -v "$DIR/gokart_controller/":/openpilot/tools/sim/gokart_controller \
   -v "$DIR/realtime.py":/openpilot/common/realtime.py \
   --device /dev/video0  --device /dev/video1 --device /dev/video2  --device /dev/video3  --device /dev/video4  --device /dev/video5 \
   --shm-size 1G \
