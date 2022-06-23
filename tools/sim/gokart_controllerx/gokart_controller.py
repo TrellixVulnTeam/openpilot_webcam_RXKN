@@ -17,12 +17,11 @@ from sensor_msgs.msg import LaserScan
 from std_msgs.msg import Float32
 from std_msgs.msg import String
 
+
 class Gokart_Controller():
-    def __init__(self, ROS_MASTER_URI):
+    def __init__(self):
         self.create_publishers()
         self.create_models()
-        rospy.init_node('Gokart_Controller')
-        rospy.core.set_node_uri(ROS_MASTER_URI)
         self.start_threads()
         
     def create_publishers(self):

@@ -33,6 +33,9 @@ from selfdrive.car.honda.values import CruiseButtons
 from selfdrive.test.helpers import set_params_enabled
 from tools.sim.lib.can import can_function
 
+from queue import Queue
+from threading import Thread
+
 
 
 def convert(value, in_min, in_max, out_min, out_max):
@@ -44,7 +47,7 @@ def convert(value, in_min, in_max, out_min, out_max):
 
 W, H = 1928, 1208
 REPEAT_COUNTER = 5
-PRINT_DECIMATION = 100
+PRINT_DECIMATION = 10000
 STEER_RATIO = 15.
 
 pm = messaging.PubMaster(['roadCameraState', 'wideRoadCameraState', 'sensorEvents', 'can', "gpsLocationExternal"])
@@ -67,7 +70,7 @@ class VehicleState:
     self.bearing_deg = 0.0
     self.vel =  1 # carla.Vector3D()
     self.cruise_button = 0
-    self.is_engaged = False
+    self.is_engaged = True
     self.ignition = True
 
 
@@ -268,6 +271,8 @@ def webcam(camerad: Camerad, exit_event: threading.Event):
     myframeid = myframeid +1 
     rk.keep_time()
 
+
+
 def connect_carla_client():
   client = carla.Client("127.0.0.1", 2000)
   client.set_timeout(5)
@@ -277,24 +282,7 @@ def connect_carla_client():
 class CarlaBridge:
 
   def __init__(self, arguments):
-    set_params_enabled()
-
-
-    print("os.environ['ROS_MASTER_URI']", os.environ['ROS_MASTER_URI'])
-
-    self.gc = Gokart_Controller(os.environ['ROS_MASTER_URI'])
-    rate = rospy.Rate(10)
-    for i in range(1,5):
-      print(i)
-      self.gc.set_turn_rate(10)
-      rate.sleep()
-
-    time.sleep(2)	
-    for i in range(1,5):
-      print(i)
-      self.gc.set_turn_rate(2)
-      rate.sleep()
-  
+    set_params_enabled()  
     msg = messaging.new_message('liveCalibration')
     msg.liveCalibration.validBlocks = 20
     msg.liveCalibration.rpyCalib = [0.0, 0.0, 0.0]
@@ -339,6 +327,32 @@ class CarlaBridge:
       self.close()
 
   def _run(self, q: Queue):
+    ###################################3
+    import string
+    import random
+
+    def id_generator(size=6, chars=string.ascii_uppercase + string.digits):
+        return ''.join(random.choice(chars) for _ in range(size))
+    id = id_generator()
+    print("id", id)
+    rospy.init_node('Gokart_Controller' + id, log_level=rospy.INFO )
+    rospy.core.set_node_uri("http://192.168.150.107:11311")
+
+    gc = Gokart_Controller()
+    rate = rospy.Rate(10)
+    for i in range(0,10):
+      print(i)
+      gc.set_turn_rate(i)
+      rate.sleep()
+    time.sleep(1)
+    for i in range(10,0, -1):
+      print(i)
+      gc.set_turn_rate(i)
+      rate.sleep()
+    time.sleep(1)
+
+    print("DONE")
+    ###################################3
     max_steer_angle = 30
     """
     client = connect_carla_client()
@@ -421,17 +435,22 @@ class CarlaBridge:
     self._threads.append(threading.Thread(target=fake_driver_monitoring, args=(self._exit_event,)))
     self._threads.append(threading.Thread(target=can_function_runner, args=(vehicle_state, self._exit_event,)))
     self._threads.append(threading.Thread(target=webcam, args=(self._camerad, self._exit_event,)))
+    ############################## Hamid threat
+
     for t in self._threads:
       t.start()
+    print("ALL threads started")
+    # self._threads.append(threading.Thread(target= hamid_ros, args=(self.gc , self._exit_event,)))
 
     # init
+
     throttle_ease_out_counter = REPEAT_COUNTER
     brake_ease_out_counter = REPEAT_COUNTER
     steer_ease_out_counter = REPEAT_COUNTER
 
     vc = carla.VehicleControl(throttle=0, steer=0, brake=0, reverse=False)
 
-    is_openpilot_engaged = False
+    is_openpilot_engaged = True
     throttle_out = steer_out = brake_out = 0.
     throttle_op = steer_op = brake_op = 0.
     throttle_manual = steer_manual = brake_manual = 0.
@@ -496,17 +515,18 @@ class CarlaBridge:
         old_throttle = throttle_out
         old_brake = brake_out
 
+      #print("While")
 
 
       if is_openpilot_engaged:
+        print("engaged")
         sm.update(0)
         if sm['carControl'].actuators.accel != 0 or sm['carControl'].actuators.steeringAngleDeg != 0 :
           converted_angle = convert( sm['carControl'].actuators.steeringAngleDeg, -45, 45, 1, 9)
           print("car accel:", sm['carControl'].actuators.accel , " car steeringAngleDeg", sm['carControl'].actuators.steeringAngleDeg, "car converted angle", converted_angle)
+          gc.set_turn_rate(converted_angle)
           print("TYPE", type(converted_angle))
-          self.gc.set_turn_rate(converted_angle)
-          # gc.set_speed(sm['carControl'].actuators.accel)
-          # rate.sleep()
+
         
         # TODO gas and brake is deprecated
         throttle_op = clip(sm['carControl'].actuators.accel / 1.6, 0.0, 1.0)
@@ -570,14 +590,14 @@ class CarlaBridge:
       vehicle_state.cruise_button = cruise_button
       vehicle_state.is_engaged = is_openpilot_engaged
 
-      if rk.frame % PRINT_DECIMATION == 0:
-        print("frame: ", "engaged:", is_openpilot_engaged, "; throttle: ", round(vc.throttle, 3), "; steer(c/deg): ",
-              round(vc.steer, 3), round(steer_out, 3), "; brake: ", round(vc.brake, 3))
+      # if rk.frame % PRINT_DECIMATION == 0:
+      #   print("frame: ", "engaged:", is_openpilot_engaged, "; throttle: ", round(vc.throttle, 3), "; steer(c/deg): ",
+      #         round(vc.steer, 3), round(steer_out, 3), "; brake: ", round(vc.brake, 3))
       """
       if rk.frame % 5 == 0:
         world.tick()
       """
-      # rk.keep_time()
+      rk.keep_time()
       self.started = True
 
   def close(self):
@@ -592,9 +612,15 @@ class CarlaBridge:
       t.join()
 
   def run(self, queue, retries=-1):
+
     bridge_p = Process(target=self.bridge_keep_alive, args=(queue, retries), daemon=True)
     bridge_p.start()
     return bridge_p
+
+
+
+
+
 
 
 if __name__ == "__main__":
@@ -603,6 +629,7 @@ if __name__ == "__main__":
 
   carla_bridge = CarlaBridge(args)
   p = carla_bridge.run(q)
+
 
   if args.joystick:
     # start input poll for joystick
