@@ -5,5 +5,5 @@ cd $DIR/../../
 
 # docker pull ghcr.io/commaai/openpilot-base:latest
 docker build \
-  -t ghcr.io/commaai/openpilot-sim:latest \
+  -t openpilot-sim-gokart:latest \
   -f tools/sim/Dockerfile.sim .

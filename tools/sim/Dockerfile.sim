@@ -13,7 +13,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends\
     vim \
     lsb-core \
     libx11-6 \
+    nano \
+    tea \
   && rm -rf /var/lib/apt/lists/*
+
+# RUN git clone https://github.com/zeromq/libzmq.git /libzmq && \
+#    cd /libzmq  && ./autogen.sh && \
+#    ./configure && make && make install
 
 # Intel OpenCL driver
 ARG INTEL_DRIVER=l_opencl_p_18.1.0.015.tgz
@@ -35,6 +41,20 @@ ENV NVIDIA_DRIVER_CAPABILITIES graphics,utility,compute
 ENV QTWEBENGINE_DISABLE_SANDBOX 1
 
 RUN dbus-uuidgen > /etc/machine-id
+
+# Install CARLA python api
+# RUN pip install --upgrade pip && \
+#    pip install --no-cache-dir carla==0.9.12
+
+RUN pip install numpy \
+    pillow \
+    tk \
+    h5py \
+    gym \
+    opencv-python
+RUN pip install -e git+https://github.com/tawnkramer/gym-donkeycar.git#egg=gym_donkeycar
+RUN pip install tensorflow-gpu
+RUN pip install tensorflow
 
 # get same tmux config used on NEOS for debugging
 RUN cd $HOME && \
@@ -87,8 +107,7 @@ RUN apt-get update && \
           python3-vcstool \
           build-essential && \
     rosdep init && \
-    rosdep update && \
-    rm -rf /var/lib/apt/lists/*
+    rosdep update
 
 
 RUN apt-get install -y --no-install-recommends  iputils-ping  net-tools
@@ -105,11 +124,15 @@ COPY ./pyextra $HOME/openpilot/pyextra
 COPY ./site_scons $HOME/openpilot/site_scons
 COPY ./rednose $HOME/openpilot/rednose
 COPY ./common $HOME/openpilot/common
+# COPY ./models $HOME/openpilot/models
 COPY ./opendbc $HOME/openpilot/opendbc
 COPY ./cereal $HOME/openpilot/cereal
 COPY ./panda $HOME/openpilot/panda
 COPY ./selfdrive $HOME/openpilot/selfdrive
 COPY ./tools $HOME/openpilot/tools
+
+# RUN sed -i 's/\/tmp\/tools\/openpilot_env\.sh/\/openpilot\/tools\/openpilot_env\.sh/g' ~/.bashrc
+# RUN echo "\nln -s -f /usr/local/lib/libzmq.so.5.2.5  /lib/x86_64-linux-gnu/libzmq.so.5" >> ~/.bashrc
 
 WORKDIR $HOME/openpilot
 RUN scons -j$(nproc)

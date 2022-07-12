@@ -15,8 +15,6 @@ xhost +local:root
 
 # docker pull ghcr.io/commaai/openpilot-sim:latest
 
-
-
 OPENPILOT_DIR="/openpilot"
 if ! [[ -z "$MOUNT_OPENPILOT" ]]
 then
@@ -36,11 +34,11 @@ docker run --net=host\
   -v "$DIR/gokart_controllerx/":/openpilot/tools/sim/gokart_controllerx \
   -v "$DIR/realtime.py":/openpilot/common/realtime.py \
   -v "$DIR/run_ros_bridge.sh":/openpilot/tools/sim/run_ros_bridge.sh \
-  --device /dev/video0  --device /dev/video1 --device /dev/video2  --device /dev/video3  --device /dev/video4  --device /dev/video5 \
+  -v "$(dirname $DIR)/":"/gokart/" \
   --shm-size 1G \
   -e DISPLAY=$DISPLAY \
   -e QT_X11_NO_MITSHM=1 \
   -w "$OPENPILOT_DIR/tools/sim" \
   $EXTRA_ARGS \
-  ghcr.io/commaai/openpilot-sim:latest \
+  openpilot-sim-gokart:latest \
   /bin/bash -c "chmod +x ./tmux_script.sh; ./tmux_script.sh $*"
